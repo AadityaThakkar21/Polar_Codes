@@ -1,9 +1,3 @@
-"""
-    Lab Group: 6
-    Project Group: 3
-    Topic: Polar Codes
-    Sub-topic: Polar Code SC vs SCL Decoding
-"""
 import numpy as np
 import math as mt
 import matplotlib.pyplot as plt
