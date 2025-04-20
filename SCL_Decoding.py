@@ -265,7 +265,7 @@ def decode(L, node, depth, SCL_N):
 final_decisions = decode(Likelihood, 0, n, SCL_N)
 
 print()
-print("|    Dcoded Message     |   Decoded U-sequence   | Path Metric |")
+print("|    Decoded Message     |   Decoded U-sequence   | Path Metric |")
 for decision in final_decisions:
     print(decision[0], decision[1], decision[2], isEqual(u_sequence, decision[1]), sep=" ")
 print()
