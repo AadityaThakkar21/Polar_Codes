@@ -188,9 +188,6 @@ def decode(L, node, depth, isFrozen):
     return [enc_msg, u_cap]
 # End decoding
 
-# def qfunc(x):
-#     return 0.5 * (1 - norm.cdf(x))
-
 # Monte-Carlo Simulation
 def monte_carlo(N, K):
 
