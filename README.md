@@ -37,5 +37,5 @@ Time Complexity: O(L · N log N)
 The added factor of L reflects the parallel tracking of L decoding candidates.
 
 
-# Compatibility with BER/Success Rate Testing: The code includes performance metrics tracking (e.g., count_successes) to evaluate decoding accuracy over many Monte Carlo trials.
+Compatibility with BER/Success Rate Testing: The code includes performance metrics tracking (e.g., count_successes) to evaluate decoding accuracy over many Monte Carlo trials.
 
