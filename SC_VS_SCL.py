@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import random as rd
 import scipy.stats as stats
 from scipy.stats import norm
-import galois as gf
 from scipy.special import erfc
 
 print()
@@ -60,17 +59,15 @@ Reliability_Sequence = [  0,   1,   2,   4,   8,  16,  32,   3,   5,  64,   9,  
                         943, 891, 998, 766, 511, 988, 1001, 951, 1002, 893, 975, 894, 1009, 955, 1004, 1010, 957, 983, 958, 
                         987, 1012, 999, 1016, 767, 989, 1003, 990, 1005, 959, 1011, 1013, 895, 1006, 1014, 1017, 1018, 991, 
                         1020, 1007, 1015, 1019, 1021, 1022, 1023]
- 
+
 # Function to set N-K frozen positions to zero and remaining K positions to message bits as per Reliability Sequence
 def getUSequence(N, K, message, rs):
-    
     u_sequence = np.zeros(N, dtype=int)
     i, j = N-K, 0
     while i < N:
         u_sequence[rs[i]] = message[j]
         j += 1
         i += 1
-    # end
     return u_sequence
 
 # An array representing state bit position like frozen bit or not (if not frozen then message bit).
@@ -80,41 +77,34 @@ def Frozen(rs, N, K):
         isFrozen[rs[i]] = True
     return isFrozen
 
-# Polar Transform G2 or Knonecker Product for N=2
+# Polar Transform G2 or Kronecker Product for N=2
 def PolarTransfromG2(u0, u1):
-
     n = len(u0)
     x = [0] * (2*n)
-    
     for i in range(n):
         x[i] = (u0[i] + u1[i]) % 2
-    
     for i in range(n, 2*n):
         x[i] = u1[i-n]
-
     return x
 
 # Min-Sum Approximation : f(L1, L2) ~= sign(L1) * sign(L2) * min(|L1|, |L2|)
 def minsum(L1, L2):
-    
     n = len(L1)
     min_sum = [0] * n
     for i in range(n):
         min_sum[i] = np.sign(L1[i]) * np.sign(L2[i]) * min(abs(L1[i]), abs(L2[i]))
     return min_sum
 
-# G Function for simple : g(L1, L2, b) = L2 + (1 - 2b) * L1 
+# G Function for simple : g(L1, L2, b) = L2 + (1 - 2b) * L1
 def g(L1, L2, b):
-
     n = len(L1)
     rep_code = [0] * n
     for i in range(n):
         rep_code[i] = L2[i] + (1 - 2*b[i]) * L1[i]
     return rep_code
 
-# Function two check wether the transmitted message is same as received message or not
+# Function to check whether the transmitted message is same as received message or not
 def isEqual(tMsg, rMsg):
-
     n = len(tMsg)
     not_equal = False
     bit_err = 0
@@ -125,22 +115,16 @@ def isEqual(tMsg, rMsg):
     return (not not_equal, bit_err/n)
 
 def encode(u_sequence, n, N):
-
     N = len(u_sequence)
     encoded_message = np.copy(u_sequence)
     m = 1
     for depth in range(n-1, -1, -1):
         for idx in range(0, N, 2*m):
-
             u0 = encoded_message[idx: idx+m]
             u1 = encoded_message[idx+m: idx+2*m]
-
-            # u0 = [u0 + u1, u1]
             encoded_message[idx: idx+m] = (u0 + u1) % 2
             encoded_message[idx+m: idx+2*m] = u1
-        # End
         m = m * 2
-    # End
     return encoded_message
 
 # Binary Phase Shift Keying (BPSK)
@@ -149,173 +133,127 @@ def BPSK(message):
 
 # Additive White Gaussian Noise (AWGN)
 def AWGN(message, Sigma):
-    # return message + Sigma * np.random.randn(N)
     noise = []
     n = len(message)
     for i in range(n):
         noise.append(Sigma * rd.normalvariate(0, 1))
-    return message + noise
+    return np.array(message) + np.array(noise)
 
 # Time Complexity: NLogN
 def decode_sc(L, node, depth, isFrozen):
-
-    # We are at leaf node
     if depth == 0:
-
-        # If given bit is frozen then simply return 0
         if isFrozen[node]:
             return [[0], [0]]
         else:
-            # If L >= 0 then make hard decision that bit is 0 else it is 1
             if L[0] >= 0:
                 return [[0], [0]]
             else:
                 return [[1], [1]]
-            # End hard decision
-    # End leaf
-
-    # L = [r1 r2]
     n = len(L)
     mid = n // 2
     r1 = L[0 : mid]
     r2 = L[mid : n]
-
-    # Step L: Decode for the left child
     left_child_beliefs = minsum(r1, r2)
     u_cap_combined_left, u_cap_left = decode_sc(left_child_beliefs, 2*node, depth-1, isFrozen)
-
-    # Step R: Decode for the right child
     right_child_beliefs = g(r1, r2, u_cap_combined_left)
     u_cap_combined_right, u_cap_right = decode_sc(right_child_beliefs, 2*node + 1, depth-1, isFrozen)
-
-    # Step U: Combine left and right child decoded bits
     enc_msg = PolarTransfromG2(u_cap_combined_left, u_cap_combined_right)
-    
-    # Step End: Just combine decoded bits into a single list
     u_cap = []
     for u in u_cap_left:
         u_cap.append(u)
-
     for u in u_cap_right:
         u_cap.append(u)
-
     return [enc_msg, u_cap]
-# End decoding
 
 def decode_scl(L, node, depth, SCL_N, isFrozen):
-
-    # We are at leaf node
     if depth == 0:
-
         decisions = []
-        # If given bit is frozen then simply return 0
         if isFrozen[node]:
             if L[0] < 0:
                 decisions.append([[0], [0], abs(L[0])])
             else:
                 decisions.append([[0], [0], 0])
         else:
-            # If L >= 0 then make hard decision that bit is 0 else it is 1
             if L[0] >= 0:
                 decisions.append([[0], [0], 0])
                 decisions.append([[1], [1], abs(L[0])])
             else:
                 decisions.append([[1], [1], 0])
                 decisions.append([[0], [0], abs(L[0])])
-            # End hard decision
         return decisions
-    # End leaf
-
-    # L = [r1 r2]
     n = len(L)
     mid = n // 2
     r1 = L[0 : mid]
     r2 = L[mid : n]
-
-    # Step L: Decode for the left child
     left_child_beliefs = minsum(r1, r2)
     left_child_decisions = decode_scl(left_child_beliefs, 2*node, depth-1, SCL_N, isFrozen)
-
     final_decisions = []
-    # Step R: Decode for the right child
     for lch_decision in left_child_decisions:
-
         right_child_beliefs = g(r1, r2, lch_decision[0])
         right_child_decisions = decode_scl(right_child_beliefs, 2*node + 1, depth-1, SCL_N, isFrozen)
-
-        # For every left combination perform Step R
         for rch_decision in right_child_decisions:
-
-            # Step U: Combine left and right child decoded bits
             enc_msg = PolarTransfromG2(lch_decision[0], rch_decision[0])
-
-            # Step End: Just combine decoded bits into a single list
             u_cap = []
             for u in lch_decision[1]:
                 u_cap.append(u)
-
             for u in rch_decision[1]:
                 u_cap.append(u)
-
             path_metric = lch_decision[2] + rch_decision[2]
             final_decisions.append([enc_msg, u_cap, path_metric])
-
-    # Prunning the unnecessary branches
     final_decisions.sort(key=lambda x: x[2])
-    final_decisions = sorted(final_decisions, key=lambda x: x[2])
     if len(final_decisions) > SCL_N:
-        for i in range(SCL_N, len(final_decisions)):
-            final_decisions.pop()
-    
+        final_decisions = final_decisions[:SCL_N]
     return final_decisions
-# End decoding
-
 
 def sc_vs_scl(N, K, M):
-
     n = int(mt.log2(N))
-
-    # Extracting Reliability Sequence for N bits
     rs = np.array([rs_pos for rs_pos in Reliability_Sequence if rs_pos < N])
     isFrozen = Frozen(rs, N, K)
-
     EbNodB_values = np.arange(0, 10, 0.5)
     P_success_sc = []
     P_success_scl = []
     BER_simulated_sc = []
     BER_simulated_scl = []
     BER_Theoretical = []
+    BER_NA = []
+    Rate = K / N
+    # Calculate Shannon limit
+    shannon_limit = 10 * np.log10((2**Rate - 1) / Rate)
 
-    # BER_Theoretical =  qfunc(np.sqrt(2 * Rate * EbNodB_values))
-        
     for EbNodB in EbNodB_values:
-        
         Success_sc = 0
         Success_scl = 0
-        N_sim = 5000
+        N_sim = 1000  # Reduced from 5000 for faster execution during testing
         N_bit_errors_sc = 0
         N_bit_errors_scl = 0
+        EbNo = 10 ** (EbNodB / 10)
+        Sigma = mt.sqrt(1 / (Rate * EbNo))
+
+        # Normal Approximation calculations
+        P = Rate * EbNo
+        C = np.log2(1 + P)
+        V = (np.log2(np.exp(1))**2) * (P * (P + 2)) / (2 * (P + 1)**2)
+        argument = np.sqrt(N / V) * (C - Rate + (np.log2(N) / (2 * N)))
+        PN_e = norm.cdf(-argument)  # Q-function is equivalent to 1 - CDF for positive argument
+        BER_NA.append(PN_e)
 
         for sim in range(N_sim):
-
-            Rate = K / N
-            EbNo = 10 ** (EbNodB / 10)
-            Sigma = mt.sqrt(1 / (Rate * EbNo))
-
-            # Generating random K bits message
-            message = np.random.randint(low = 0, high = 2, size = K, dtype = int)
-
-            # Setting N-K frozen positions to zero and remaining K positions to message bits
+            message = np.random.randint(low=0, high=2, size=K, dtype=int)
             u_sequence = getUSequence(N, K, message, rs)
             encoded_message = encode(u_sequence, n, N)
-            
-            # Performing BPSK and AWGN
             bpsk_modulated_sequence = BPSK(encoded_message)
-            received_sequqnce = AWGN(bpsk_modulated_sequence, Sigma)
-            Likelihood = received_sequqnce
-            enc_msg_while_decoding, decoded_u_sequence_sc = np.array(decode_sc(Likelihood, 0, n, isFrozen))
-            decoded_u_sequence_scl = decode_scl(Likelihood, 0, n, M, isFrozen)[0][1]
-
+            received_sequence = AWGN(bpsk_modulated_sequence, Sigma)
+            Likelihood = received_sequence
+            
+            # SC decoding
+            sc_result = decode_sc(Likelihood, 0, n, isFrozen)
+            decoded_u_sequence_sc = np.array(sc_result[1]).flatten()
+            
+            # SCL decoding
+            scl_result = decode_scl(Likelihood, 0, n, M, isFrozen)
+            decoded_u_sequence_scl = np.array(scl_result[0][1]).flatten()
+            
+            # Compare with original u_sequence
             success_flag_sc = True
             success_flag_scl = True
             for i in range(N):
@@ -329,40 +267,37 @@ def sc_vs_scl(N, K, M):
                 Success_sc += 1
             if success_flag_scl:
                 Success_scl += 1
-
-            # End for
-        # End Nsim
+        
         P_success_sc.append(Success_sc / N_sim)
         P_success_scl.append(Success_scl / N_sim)
-
         BER_simulated_sc.append(N_bit_errors_sc / (N * N_sim))
         BER_simulated_scl.append(N_bit_errors_scl / (N * N_sim))
-
-        BER_Theoretical.append(0.5 * erfc(np.sqrt(Rate * EbNo)))
+        # BER_Theoretical.append(0.5 * erfc(np.sqrt(Rate * EbNo)))
 
     plt.figure(1)
-    plt.plot(EbNodB_values, np.array(BER_simulated_sc), label = f"N={N}, K={K} Sim BER SC") 
-    plt.plot(EbNodB_values, np.array(BER_simulated_scl), label = f"N={N}, K={K} Sim BER SCL") 
-    plt.plot(EbNodB_values, BER_Theoretical, label = f"N={N}, K={K} Theory BER", linestyle='--') 
+    plt.plot(EbNodB_values, np.array(BER_simulated_sc), label=f"N={N}, K={K} Sim BER SC")
+    plt.plot(EbNodB_values, np.array(BER_simulated_scl), label=f"N={N}, K={K} Sim BER SCL")
+    # plt.plot(EbNodB_values, BER_Theoretical, label=f"N={N}, K={K} Theory BER", linestyle='--')
+    plt.plot(EbNodB_values, BER_NA, label=f"N={N}, K={K} Normal Approximation", linestyle='-.')
+    plt.axvline(x=shannon_limit, color='k', linestyle=':', label='Shannon Limit')
     plt.ylim(1e-4, 1)
-    # plt.xlim(0, 5)
     plt.yscale("log")
-    plt.xlabel("Eb/No (dB)")  
-    plt.ylabel("BER")  
-    plt.title("BER v/s Eb/No SC vs SCL")
+    plt.xlabel("Eb/No (dB)")
+    plt.ylabel("BER")
+    plt.title("BER vs Eb/No SC vs SCL")
     plt.grid(True, which="both", axis="both")
     plt.legend()
 
     plt.figure(2)
-    plt.plot(EbNodB_values, np.array(P_success_sc), label = f"N={N}, K={K} Psuccess SC") 
-    plt.plot(EbNodB_values, np.array(P_success_scl), label = f"N={N}, K={K} Psuccess SCL") 
-    plt.xlabel("Eb/No (dB)")  
-    plt.ylabel("P_Success")  
-    plt.title("P_Success v/s Eb/No SC vs SCL")
+    plt.plot(EbNodB_values, np.array(P_success_sc), label=f"N={N}, K={K} Psuccess SC")
+    plt.plot(EbNodB_values, np.array(P_success_scl), label=f"N={N}, K={K} Psuccess SCL")
+    plt.axvline(x=shannon_limit, color='k', linestyle=':', label='Shannon Limit')
+    plt.xlabel("Eb/No (dB)")
+    plt.ylabel("P_Success")
+    plt.title("P_Success vs Eb/No SC vs SCL")
     plt.grid(True)
     plt.legend()
 
     plt.show()
-# N: Total number of bits
-# K: Number of message bits
+
 sc_vs_scl(64, 40, 4)
